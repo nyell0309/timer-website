@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Timer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .card {
+      width: 90%;
+      max-width: 420px;
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      font-size: 26px;
+    }
+
+    #status {
+      margin: 15px 0;
+      font-size: 18px;
+      color: #cbd5e1;
+    }
+
+    button {
+      font-size: 16px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      transition: transform 0.15s ease, opacity 0.2s ease;
+      box-shadow: 0 5px 15px rgba(34,197,94,0.3);
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .progress-container {
+      width: 100%;
+      height: 14px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 50px;
+      overflow: hidden;
+      margin-top: 20px;
+    }
+
+    #progress {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #22c55e, #38bdf8);
+      border-radius: 50px;
+      transition: width 0.4s ease;
+    }
+
+    .emoji {
+      font-size: 22px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="card">
+  <h1>⏱️ Timer</h1>
+
+  <button id="startBtn" onclick="startTimer()">Start night 🌙</button>
+
+  <h2 id="status">Waiting...</h2>
+
+  <div class="progress-container">
+    <div id="progress"></div>
+  </div>
+</div>
+
+<script>
+  let running = false;
+  let paused = false;
+
+  let audioCtx = null;
+  let audioUnlocked = false;
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function waitWhilePaused() {
+    while (paused) await sleep(200);
+  }
+
+  function updateProgress(percent) {
+    document.getElementById("progress").style.width = percent + "%";
+  }
+
+  function playBeep() {
+    if (!audioCtx) return;
+
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+    gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.15);
+  }
+
+  async function unlockAudio() {
+    if (audioUnlocked) return;
+
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    await audioCtx.resume();
+
+    playBeep();
+    audioUnlocked = true;
+  }
+
+  async function countdown(seconds, label, startP, endP) {
+    for (let i = seconds; i > 0; i--) {
+      await waitWhilePaused();
+
+      document.getElementById("status").innerText = `${label} ${i}s`;
+
+      let progressStep = (seconds - i) / seconds;
+      let totalProgress = startP + (endP - startP) * progressStep;
+      updateProgress(totalProgress);
+
+      await sleep(1000);
+    }
+  }
+
+  async function alarm(text) {
+    for (let i = 0; i < 6; i++) {
+      await waitWhilePaused();
+
+      document.getElementById("status").innerText =
+        i % 2 === 0 ? text : "🔔 ALERT 🔔";
+
+      playBeep();
+
+      if (navigator.vibrate) navigator.vibrate(200);
+
+      await sleep(400);
+    }
+  }
+
+  async function startTimer() {
+    if (running) return;
+
+    await unlockAudio();
+
+    running = true;
+    document.getElementById("startBtn").disabled = true;
+
+    await countdown(5, "First phase:", 0, 16);
+    await alarm("⏰ Mafia wakes up!");
+
+    await countdown(20, "Second phase:", 16, 83);
+    await alarm("😴 Mafia sleeps!");
+
+    await countdown(5, "Final phase:", 83, 100);
+    await alarm("⏰ Everyone wakes up!");
+
+    updateProgress(100);
+    document.getElementById("status").innerText = "✅ Finished!";
+
+    running = false;
+    document.getElementById("startBtn").disabled = false;
+  }
+</script>
+
+</body>
+</html>
