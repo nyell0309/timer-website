@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Timer</title>
+</head>
+
+<body style="text-align:center; font-family:sans-serif; margin-top:50px;">
+
+  <h1>⏱️ Timer</h1>
+
+  <button id="startBtn" onclick="startTimer()" style="font-size:18px; padding:10px 20px;">▶️ Start</button>
+
+  <h2 id="status">Waiting...</h2>
+
+  <!-- Progress Bar -->
+  <div style="width:80%; margin:20px auto; background:#ddd; height:20px; border-radius:10px;">
+    <div id="progress" style="height:100%; width:0%; background:#4caf50; border-radius:10px;"></div>
+  </div>
+
+  <script>
+    let running = false;
+    let paused = false;
+
+    let audioCtx = null;
+    let audioUnlocked = false;
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function waitWhilePaused() {
+      while (paused) {
+        await sleep(200);
+      }
+    }
+
+    function updateProgress(percent) {
+      document.getElementById("progress").style.width = percent + "%";
+    }
+
+    // 🔊 Web Audio Beep
+    function playBeep() {
+      if (!audioCtx) return;
+
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+
+      gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.2);
+    }
+
+    // 🔓 Unlock Audio
+    async function unlockAudio() {
+      if (audioUnlocked) return;
+
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      try {
+        await audioCtx.resume();
+        playBeep(); // short silent-ish beep to activate
+        audioUnlocked = true;
+        console.log("Audio unlocked");
+      } catch (e) {
+        console.log("Audio unlock failed:", e);
+      }
+    }
+
+    async function countdown(seconds, label, startP, endP) {
+      for (let i = seconds; i > 0; i--) {
+        await waitWhilePaused();
+
+        document.getElementById("status").innerText = `${label} ${i}s`;
+
+        let progressStep = (seconds - i) / seconds;
+        let totalProgress = startP + (endP - startP) * progressStep;
+        updateProgress(totalProgress);
+
+        await sleep(1000);
+      }
+    }
+
+    async function alarm(text) {
+      for (let i = 0; i < 6; i++) {
+        await waitWhilePaused();
+
+        document.getElementById("status").innerText =
+          i % 2 === 0 ? text : "🔔🔔🔔";
+
+        playBeep();
+
+        if (navigator.vibrate) {
+          navigator.vibrate(200);
+        }
+
+        await sleep(400);
+      }
+    }
+
+    async function startTimer() {
+      if (running) return;
+
+      await unlockAudio(); // 🔑 critical
+
+      running = true;
+      paused = false;
+      document.getElementById("startBtn").disabled = true;
+
+      await countdown(5, "First timer:", 0, 16);
+      await alarm("⏰ FIRST DONE!");
+
+      await countdown(20, "Second timer:", 16, 83);
+      await alarm("⏰ SECOND DONE!");
+
+      await countdown(5, "Final timer:", 83, 100);
+      await alarm("⏰ FINAL DONE!");
+
+      updateProgress(100);
+      document.getElementById("status").innerText = "✅ Finished!";
+
+      running = false;
+      document.getElementById("startBtn").disabled = false;
+    }
+
+
+  </script>
+
+</body>
+</html>
